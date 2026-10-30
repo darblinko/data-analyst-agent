@@ -252,6 +252,36 @@ def test_outputs_replaced_by_a_symlink_is_not_followed(tmp_path):
     assert (outside / "keep.txt").read_text() == "keep"
 
 
+def test_oversized_artifacts_are_not_saved(tmp_path):
+    artifact_dir = tmp_path / "artifacts"
+    limits = ExecutionLimits(timeout_s=10.0, max_artifact_bytes=1_000)
+    code = (
+        "open('outputs/small.txt', 'w').write('x' * 10)\n"
+        "with open('outputs/huge.bin', 'wb') as f:\n"
+        "    f.truncate(8 * 1024**3)\n"
+    )
+
+    result = run_python(code, artifact_dir=artifact_dir, limits=limits)
+
+    assert result.artifacts == ("small.txt",)
+    assert sorted(p.name for p in artifact_dir.iterdir()) == ["small.txt"]
+    assert result.skipped_artifacts == ("huge.bin (larger than 1,000 bytes)",)
+    assert "[not saved] huge.bin (larger than 1,000 bytes)" in format_for_model(result, limits)
+
+
+def test_artifact_count_is_capped(tmp_path):
+    limits = ExecutionLimits(timeout_s=10.0, max_artifacts=3)
+    code = "for i in range(5):\n    open(f'outputs/f{i}.txt', 'w').write(str(i))\n"
+
+    result = run_python(code, artifact_dir=tmp_path / "artifacts", limits=limits)
+
+    assert result.artifacts == ("f0.txt", "f1.txt", "f2.txt")
+    assert result.skipped_artifacts == (
+        "f3.txt (more than 3 files)",
+        "f4.txt (more than 3 files)",
+    )
+
+
 def test_concurrent_collection_never_reuses_a_file_name(tmp_path):
     artifact_dir = tmp_path / "artifacts"
     calls = 16
@@ -266,7 +296,7 @@ def test_concurrent_collection_never_reuses_a_file_name(tmp_path):
 
     def collect(output_dir: Path) -> None:
         barrier.wait()
-        saved.extend(_collect_artifacts(output_dir, artifact_dir))
+        saved.extend(_collect_artifacts(output_dir, artifact_dir, FAST)[0])
 
     threads = [threading.Thread(target=collect, args=(d,)) for d in output_dirs]
     for thread in threads:

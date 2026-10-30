@@ -3,7 +3,7 @@
 Each call gets a fresh interpreter, a temporary working directory that is deleted
 afterwards, an environment built from an allowlist (API keys and other variables of
 the parent process are not passed on), a wall-clock timeout that kills the whole
-process group, and a cap on the captured output.
+process group, a cap on the captured output, and caps on the size and number of saved files.
 
 This is process isolation with a timeout. It is not a security sandbox: the child runs
 as the same user, can read and write any file that user can, and has network access.
@@ -29,6 +29,8 @@ DATA_DIRNAME = "data"
 OUTPUT_DIRNAME = "outputs"
 READ_CHUNK_BYTES = 65_536
 READER_JOIN_TIMEOUT_S = 5.0
+MAX_ARTIFACT_BYTES = 25_000_000
+MAX_ARTIFACTS = 20
 
 # Runs inside the child. Executes cell.py as a fresh __main__ module, so functions defined in
 # the cell can be pickled, and prints tracebacks without this wrapper's frame. Installation
@@ -59,6 +61,8 @@ except BaseException as error:
 class ExecutionLimits:
     timeout_s: float = 30.0
     max_output_bytes: int = 20_000
+    max_artifact_bytes: int = MAX_ARTIFACT_BYTES
+    max_artifacts: int = MAX_ARTIFACTS
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,7 @@ class ExecutionResult:
     output_truncated: bool
     duration_s: float
     artifacts: tuple[str, ...]
+    skipped_artifacts: tuple[str, ...] = ()  # "name (reason)" for files that were not saved
 
     @property
     def succeeded(self) -> bool:
@@ -98,9 +103,9 @@ def run_python(
         started = time.monotonic()
         exit_code, timed_out, stdout, stderr = _run_child(workdir, python, limits)
         duration_s = time.monotonic() - started
-        artifacts = ()
+        artifacts, skipped = (), ()
         if artifact_dir is not None:
-            artifacts = _collect_artifacts(workdir / OUTPUT_DIRNAME, artifact_dir)
+            artifacts, skipped = _collect_artifacts(workdir / OUTPUT_DIRNAME, artifact_dir, limits)
     return ExecutionResult(
         stdout=stdout.text,
         stderr=stderr.text,
@@ -109,6 +114,7 @@ def run_python(
         output_truncated=stdout.truncated or stderr.truncated,
         duration_s=duration_s,
         artifacts=artifacts,
+        skipped_artifacts=skipped,
     )
 
 
@@ -143,6 +149,8 @@ def format_for_model(result: ExecutionResult, limits: ExecutionLimits) -> str:
         )
     if result.artifacts:
         parts.append(f"[saved files] {', '.join(result.artifacts)}")
+    if result.skipped_artifacts:
+        parts.append(f"[not saved] {', '.join(result.skipped_artifacts)}")
     return "\n".join(parts) or "[no output]"
 
 
@@ -221,21 +229,49 @@ class _CappedReader:
         return self.total_bytes > self._limit
 
 
-def _collect_artifacts(output_dir: Path, artifact_dir: Path) -> tuple[str, ...]:
-    """Move regular files from outputs/ to artifact_dir. Symlinks and folders are skipped."""
+def _collect_artifacts(
+    output_dir: Path, artifact_dir: Path, limits: ExecutionLimits
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Move regular files from outputs/ to artifact_dir. Symlinks and folders are skipped.
+
+    Returns the saved names and, for files over the size or count limit or that could not
+    be moved, "name (reason)" notes.
+    """
     # The code may have deleted outputs/ or replaced it with a link to another folder.
     if output_dir.is_symlink() or not output_dir.is_dir():
-        return ()
+        return (), ()
     files = [p for p in sorted(output_dir.iterdir()) if p.is_file() and not p.is_symlink()]
-    if not files:
-        return ()
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    saved = []
+    saved: list[str] = []
+    skipped: list[str] = []
     for path in files:
-        target = _reserve_path(artifact_dir, path.name)
+        try:
+            reason = _skip_reason(path, len(saved), limits)
+            if reason is None:
+                saved.append(_move_artifact(path, artifact_dir))
+        except OSError as error:
+            reason = f"could not be saved: {error.strerror or error}"
+        if reason is not None:
+            skipped.append(f"{path.name} ({reason})")
+    return tuple(saved), tuple(skipped)
+
+
+def _skip_reason(path: Path, saved_count: int, limits: ExecutionLimits) -> str | None:
+    if saved_count >= limits.max_artifacts:
+        return f"more than {limits.max_artifacts} files"
+    if path.stat().st_size > limits.max_artifact_bytes:
+        return f"larger than {limits.max_artifact_bytes:,} bytes"
+    return None
+
+
+def _move_artifact(path: Path, artifact_dir: Path) -> str:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    target = _reserve_path(artifact_dir, path.name)
+    try:
         shutil.move(path, target)
-        saved.append(target.name)
-    return tuple(saved)
+    except OSError:
+        target.unlink(missing_ok=True)
+        raise
+    return target.name
 
 
 def _reserve_path(directory: Path, name: str) -> Path:

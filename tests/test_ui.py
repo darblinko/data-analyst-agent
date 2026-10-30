@@ -4,6 +4,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from data_analyst_agent.demo_script import DEMO_QUESTIONS, DEMO_SCRIPT
+from data_analyst_agent.executor import MAX_ARTIFACT_BYTES
 
 TIMEOUT_S = 60
 
@@ -43,3 +44,28 @@ def test_missing_api_key_is_shown_as_an_error(app_path, monkeypatch):
 
     assert not app.exception
     assert "OPENAI_API_KEY is not set" in app.error[0].value
+
+
+def _render_saved_files(root: str, names: list[str]) -> None:
+    from pathlib import Path
+
+    from data_analyst_agent.ui.render import render_saved_file
+    from data_analyst_agent.workspace import Workspace
+
+    for name in names:
+        render_saved_file(name, "call-1", Workspace(Path(root)))
+
+
+def test_saved_file_over_the_size_limit_is_not_loaded(tmp_path):
+    artifact_dir = tmp_path / "artifacts"
+    artifact_dir.mkdir()
+    (artifact_dir / "small.txt").write_text("hello")
+    with (artifact_dir / "huge.bin").open("wb") as handle:
+        handle.truncate(MAX_ARTIFACT_BYTES + 1)
+    app = AppTest.from_function(
+        _render_saved_files, args=(str(tmp_path), ["small.txt", "huge.bin"])
+    ).run()
+
+    assert not app.exception
+    assert [b.label for b in app.get("download_button")] == ["Download small.txt"]
+    assert "huge.bin is larger than 25,000,000 bytes" in app.caption[0].value

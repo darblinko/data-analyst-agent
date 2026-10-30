@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import streamlit as st
 import streamlit.components.v1 as components
 
+from data_analyst_agent.executor import MAX_ARTIFACT_BYTES
 from data_analyst_agent.transcript import (
     AssistantEntry,
     CodePart,
@@ -56,6 +57,9 @@ def render_saved_file(name: str, call_id: str, workspace: Workspace) -> None:
     path = workspace.artifact_path(name)
     if path is None:
         st.caption(f"{name} is no longer available.")
+        return
+    if path.stat().st_size > MAX_ARTIFACT_BYTES:
+        st.caption(f"{name} is larger than {MAX_ARTIFACT_BYTES:,} bytes and is not shown.")
         return
     if path.suffix.lower() == ".html":
         # The HTML was written by generated code. It is shown in Streamlit's component iframe.
