@@ -15,8 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uvx ruff check .
-      - run: uvx ruff format --check .
+      # Ruff from uv.lock, so CI and a local `uv run ruff` apply the same rules.
+      - run: uv sync --frozen --only-dev
+      - run: uv run --frozen --no-sync ruff check .
+      - run: uv run --frozen --no-sync ruff format --check .
 
   test:
     runs-on: ubuntu-latest
