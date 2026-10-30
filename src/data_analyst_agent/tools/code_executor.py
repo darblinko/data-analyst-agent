@@ -20,7 +20,7 @@ from typing import Any
 from langchain_core.tools import tool
 
 # Project root directory - all file operations are scoped here
-PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 # Persistent execution namespace (survives between tool calls within a session)
 # This allows agents to define variables/functions and use them in subsequent calls

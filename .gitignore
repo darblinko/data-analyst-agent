@@ -1,38 +1,28 @@
 # Virtual environment
 .venv/
-venv/
 
-# Environment variables (contains API keys)
+# Environment variables (API keys)
 .env
 
-# Python cache
+# Python and tool caches
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
 
-# Uploaded files (user data, not committed)
+# Local run output
+logs/
 uploads/
+results/scratch/
 
-# uv
-.uv/
-uv.lock
+# Streamlit local configuration
+.streamlit/secrets.toml
 
-# Streamlit
-.streamlit/
-
-# OS files
+# OS and editor files
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/settings.json
 .idea/
-
-# Jupyter (if used)
-*.ipynb
-.ipynb_checkpoints/
-
-# Logs
-*.log
+.vscode/settings.json

@@ -17,9 +17,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from src.agent.state import AgentState
-from src.agent.llm_manager import get_llm
-from src.tools.code_executor import python_repl, reset_execution_namespace
+from data_analyst_agent.agent.state import AgentState
+from data_analyst_agent.agent.llm_manager import get_llm
+from data_analyst_agent.tools.code_executor import python_repl, reset_execution_namespace
 
 # ─── System prompt ───────────────────────────────────────────────────────────
 

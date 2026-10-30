@@ -20,12 +20,9 @@ import streamlit as st
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-# Ensure project root is on the Python path so `src.*` imports work
-PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 from langchain_core.messages import AIMessage, AIMessageChunk, ToolMessage
 import streamlit.components.v1 as components
@@ -33,9 +30,9 @@ import re
 import json
 from datetime import datetime
 
-from src.agent.llm_manager import get_provider_model_options, get_default_model
-from src.agent.graph import run_agent
-from src.tools.code_executor import reset_execution_namespace
+from data_analyst_agent.agent.llm_manager import get_provider_model_options, get_default_model
+from data_analyst_agent.agent.graph import run_agent
+from data_analyst_agent.tools.code_executor import reset_execution_namespace
 
 # ─── Page Configuration ───────────────────────────────────────────────────────
 
