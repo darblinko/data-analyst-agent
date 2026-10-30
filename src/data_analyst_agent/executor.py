@@ -232,17 +232,26 @@ def _collect_artifacts(output_dir: Path, artifact_dir: Path) -> tuple[str, ...]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     saved = []
     for path in files:
-        target = _unique_path(artifact_dir, path.name)
+        target = _reserve_path(artifact_dir, path.name)
         shutil.move(path, target)
         saved.append(target.name)
     return tuple(saved)
 
 
-def _unique_path(directory: Path, name: str) -> Path:
-    candidate = directory / name
+def _reserve_path(directory: Path, name: str) -> Path:
+    """Create an empty file under a free name and return its path.
+
+    O_EXCL makes the reservation atomic, so tool calls that run at the same time never get
+    the same name. The caller replaces the empty file with the artifact.
+    """
     stem, suffix = Path(name).stem, Path(name).suffix
+    candidate = directory / name
     counter = 2
-    while candidate.exists():
-        candidate = directory / f"{stem}-{counter}{suffix}"
-        counter += 1
-    return candidate
+    while True:
+        try:
+            os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+        except FileExistsError:
+            candidate = directory / f"{stem}-{counter}{suffix}"
+            counter += 1
+        else:
+            return candidate

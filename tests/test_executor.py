@@ -1,6 +1,7 @@
 import ast
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pytest
 from data_analyst_agent.executor import (
     ExecutionLimits,
     ExecutionResult,
+    _collect_artifacts,
     format_for_model,
     run_python,
 )
@@ -248,6 +250,33 @@ def test_outputs_replaced_by_a_symlink_is_not_followed(tmp_path):
 
     assert result.artifacts == ()
     assert (outside / "keep.txt").read_text() == "keep"
+
+
+def test_concurrent_collection_never_reuses_a_file_name(tmp_path):
+    artifact_dir = tmp_path / "artifacts"
+    calls = 16
+    output_dirs = []
+    for index in range(calls):
+        output_dir = tmp_path / f"outputs-{index}"
+        output_dir.mkdir()
+        (output_dir / "chart.html").write_text(str(index))
+        output_dirs.append(output_dir)
+    barrier = threading.Barrier(calls)
+    saved: list[str] = []
+
+    def collect(output_dir: Path) -> None:
+        barrier.wait()
+        saved.extend(_collect_artifacts(output_dir, artifact_dir))
+
+    threads = [threading.Thread(target=collect, args=(d,)) for d in output_dirs]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(set(saved)) == calls
+    contents = sorted(int((artifact_dir / name).read_text()) for name in saved)
+    assert contents == list(range(calls))
 
 
 def _wait_until_gone(pid: int, timeout_s: float = 3.0) -> bool:
