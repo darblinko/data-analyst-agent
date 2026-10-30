@@ -30,16 +30,21 @@ OUTPUT_DIRNAME = "outputs"
 READ_CHUNK_BYTES = 65_536
 READER_JOIN_TIMEOUT_S = 5.0
 
-# Runs inside the child. Executes cell.py and prints tracebacks without this wrapper's frame.
-# Installation paths in library frames are shortened to <env> and <python>.
+# Runs inside the child. Executes cell.py as a fresh __main__ module, so functions defined in
+# the cell can be pickled, and prints tracebacks without this wrapper's frame. Installation
+# paths in library frames are shortened to <env> and <python>.
 _RUNNER = """\
 import sys
 import traceback
+import types
 
 with open("cell.py", encoding="utf-8") as source_file:
     source = source_file.read()
+cell_module = types.ModuleType("__main__")
+cell_module.__file__ = "cell.py"
+sys.modules["__main__"] = cell_module
 try:
-    exec(compile(source, "cell.py", "exec"), {"__name__": "__main__"})
+    exec(compile(source, "cell.py", "exec"), cell_module.__dict__)
 except SystemExit:
     raise
 except BaseException as error:

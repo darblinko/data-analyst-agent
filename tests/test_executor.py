@@ -206,6 +206,28 @@ def test_format_for_model_marks_empty_output():
     assert format_for_model(result, FAST) == "[no output]"
 
 
+def test_functions_defined_in_the_cell_can_be_pickled():
+    code = (
+        "import pickle\n"
+        "def square(x):\n"
+        "    return x * x\n"
+        "print(pickle.loads(pickle.dumps(square))(7))\n"
+    )
+
+    result = run_python(code, limits=FAST)
+
+    assert result.stderr == ""
+    assert result.stdout == "49\n"
+
+
+def test_cell_runs_as_the_main_module():
+    code = "import sys\nvalue = 5\nprint(__name__, sys.modules['__main__'].value)"
+
+    result = run_python(code, limits=FAST)
+
+    assert result.stdout == "__main__ 5\n"
+
+
 def _wait_until_gone(pid: int, timeout_s: float = 3.0) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
