@@ -38,6 +38,15 @@ def test_exception_is_reported_with_traceback_and_nonzero_exit():
     assert "exec(compile" not in result.stderr
 
 
+def test_library_frames_do_not_show_installation_paths():
+    result = run_python("import json\njson.loads('{')", limits=FAST)
+
+    assert "json.decoder.JSONDecodeError" in result.stderr
+    assert sys.prefix not in result.stderr
+    assert sys.base_prefix not in result.stderr
+    assert "<python>" in result.stderr or "<env>" in result.stderr
+
+
 def test_syntax_error_is_reported():
     result = run_python("def broken(:\n    pass", limits=FAST)
 

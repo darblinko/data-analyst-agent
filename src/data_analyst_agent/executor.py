@@ -31,6 +31,7 @@ READ_CHUNK_BYTES = 65_536
 READER_JOIN_TIMEOUT_S = 5.0
 
 # Runs inside the child. Executes cell.py and prints tracebacks without this wrapper's frame.
+# Installation paths in library frames are shortened to <env> and <python>.
 _RUNNER = """\
 import sys
 import traceback
@@ -42,7 +43,9 @@ try:
 except SystemExit:
     raise
 except BaseException as error:
-    traceback.print_exception(type(error), error, error.__traceback__.tb_next)
+    lines = traceback.format_exception(type(error), error, error.__traceback__.tb_next)
+    text = "".join(lines).replace(sys.prefix, "<env>").replace(sys.base_prefix, "<python>")
+    sys.stderr.write(text)
     sys.exit(1)
 """
 
