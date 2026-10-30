@@ -1,0 +1,38 @@
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables (contains API keys)
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Uploaded files (user data, not committed)
+uploads/
+
+# uv
+.uv/
+uv.lock
+
+# Streamlit
+.streamlit/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Jupyter (if used)
+*.ipynb
+.ipynb_checkpoints/
+
+# Logs
+*.log
