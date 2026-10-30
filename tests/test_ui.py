@@ -5,6 +5,7 @@ from streamlit.testing.v1 import AppTest
 
 from data_analyst_agent.demo_script import DEMO_QUESTIONS, DEMO_SCRIPT
 from data_analyst_agent.executor import MAX_ARTIFACT_BYTES
+from data_analyst_agent.replay import ReplayChatModel
 
 TIMEOUT_S = 60
 
@@ -16,6 +17,21 @@ def app_path(repo_root):
 
 def all_markdown(app: AppTest) -> str:
     return "\n".join(element.value for element in app.markdown)
+
+
+def all_captions(app: AppTest) -> str:
+    return "\n".join(element.value for element in app.caption)
+
+
+@pytest.fixture
+def replay_with_usage(monkeypatch):
+    """Live-model mode with the replay model standing in for the provider."""
+    monkeypatch.setenv("DEMO_MODE", "0")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setattr(
+        "data_analyst_agent.ui.app.get_chat_model",
+        lambda provider, model: ReplayChatModel(script=DEMO_SCRIPT, reported_usage=(10, 4)),
+    )
 
 
 def test_demo_mode_answers_a_scripted_question(app_path, monkeypatch):
@@ -69,3 +85,17 @@ def test_saved_file_over_the_size_limit_is_not_loaded(tmp_path):
     assert not app.exception
     assert [b.label for b in app.get("download_button")] == ["Download small.txt"]
     assert "huge.bin is larger than 25,000,000 bytes" in app.caption[0].value
+
+
+def test_failed_turn_still_counts_the_tokens_of_completed_model_calls(
+    app_path, monkeypatch, replay_with_usage
+):
+    monkeypatch.setenv("MAX_AGENT_ITERATIONS", "2")  # the growth question needs three calls
+    app = AppTest.from_file(app_path, default_timeout=TIMEOUT_S).run()
+
+    app = app.chat_input[0].set_value(DEMO_SCRIPT[2].question).run()
+
+    assert not app.exception
+    assert "Stopped after 2 model calls" in app.error[0].value
+    assert "Session: 20 in, 8 out, 28 total" in all_captions(app)
+    assert "Last question: 28 tokens over 2 model calls" in all_captions(app)

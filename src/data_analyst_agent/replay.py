@@ -45,6 +45,8 @@ class ReplayChatModel(BaseChatModel):
     tool_name: str = TOOL_NAME
     token_delay_s: float = 0.0
     bound_tools: tuple[str, ...] = ()
+    # Token counts to report on every response, for tests of usage accounting.
+    reported_usage: tuple[int, int] | None = None
 
     @property
     def _llm_type(self) -> str:
@@ -84,7 +86,9 @@ class ReplayChatModel(BaseChatModel):
             tool_calls.append(
                 {"name": self.tool_name, "args": {"code": step.code}, "id": _new_call_id()}
             )
-        message = AIMessage(content=step.text, tool_calls=tool_calls)
+        message = AIMessage(
+            content=step.text, tool_calls=tool_calls, usage_metadata=self._usage_metadata()
+        )
         return ChatResult(generations=[ChatGeneration(message=message)])
 
     def _stream(
@@ -111,6 +115,20 @@ class ReplayChatModel(BaseChatModel):
             yield ChatGenerationChunk(
                 message=AIMessageChunk(content="", tool_call_chunks=[tool_call_chunk])
             )
+        if self.reported_usage is not None:
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(content="", usage_metadata=self._usage_metadata())
+            )
+
+    def _usage_metadata(self) -> dict | None:
+        if self.reported_usage is None:
+            return None
+        input_tokens, output_tokens = self.reported_usage
+        return {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        }
 
     def _help_text(self) -> str:
         listed = "\n".join(f"- {q.question}" for q in self.script)

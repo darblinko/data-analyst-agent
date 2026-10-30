@@ -15,7 +15,7 @@ Screenshot of `DEMO_MODE=1 ./run.sh` after the second demo question, taken on 20
 - Runs each tool call in a new Python process with a wall-clock timeout, a temporary working directory, an environment built from an allowlist (no API keys) and a cap on captured output.
 - Shows saved charts and files in the chat. Plotly HTML renders inline, images render as images, and every file has a download button.
 - Supports OpenAI and Anthropic models, chosen in the sidebar. Model IDs come from environment variables.
-- Reports token usage per question and per session, summed over every model call in the question.
+- Reports token usage per question and per session, summed over every completed model call in the question, including questions that end with an error.
 - Offers a demo mode (`DEMO_MODE=1`) that replays three prepared questions without a model. The code in each answer runs for real on a bundled dataset that a seeded script generates.
 
 ## How it works
@@ -34,7 +34,7 @@ flowchart LR
 
 **Executor.** [executor.py](src/data_analyst_agent/executor.py) writes the code to `cell.py` in a new temporary directory, copies the session's data files into `data/`, and starts `python -I` with `stdin` closed, a new session and an environment of seven variables (`PATH`, `HOME`, `TMPDIR`, `LANG`, `LC_ALL`, `MPLBACKEND`, `MPLCONFIGDIR`). Two reader threads keep at most `MAX_OUTPUT_BYTES` of stdout and of stderr. At `CODE_TIMEOUT_S`, and again after every normal exit, the whole process group gets `SIGKILL`, so background processes started by the code do not outlive the call while they stay in that group. A process that the code moves to a new session or process group (`setsid`, `subprocess.Popen(..., start_new_session=True)`) is not killed. Files written to `outputs/` are moved to the session's artifact folder and listed in the tool message artifact, which is how the page finds charts. At most 20 files of at most 25 MB each are kept per call; the tool message names the files that were not saved. The directory is then deleted.
 
-**Streaming.** `run_turn` reads the graph with the `messages`, `updates` and `values` stream modes and yields typed events: text deltas, code submitted, code finished and turn finished. The page redraws only the part of the reply that changed.
+**Streaming.** `run_turn` reads the graph with the `messages`, `updates` and `values` stream modes and yields typed events: text deltas, code submitted, code finished, model usage and turn finished. The page redraws only the part of the reply that changed.
 
 **Demo mode.** [replay.py](src/data_analyst_agent/replay.py) is a LangChain chat model that looks up the last question in a script and returns the next scripted step, streamed word by word. It makes no network calls. Its tool calls go through the same graph, tool and executor as a real model's. The third demo question includes a deliberate wrong column name, so the recording shows a `KeyError` and the corrected rerun. `tests/test_graph.py` fails if a number in a scripted answer does not appear in the code output.
 

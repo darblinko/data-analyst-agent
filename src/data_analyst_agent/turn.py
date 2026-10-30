@@ -38,12 +38,19 @@ class CodeFinished:
 
 
 @dataclass(frozen=True)
+class ModelUsage:
+    """Usage of one completed model call, sent even if the turn fails later."""
+
+    usage: TokenUsage
+
+
+@dataclass(frozen=True)
 class TurnFinished:
     new_messages: tuple[BaseMessage, ...]
     usage: TokenUsage
 
 
-TurnEvent = TextDelta | CodeSubmitted | CodeFinished | TurnFinished
+TurnEvent = TextDelta | CodeSubmitted | CodeFinished | ModelUsage | TurnFinished
 
 
 class StepLimitReached(RuntimeError):
@@ -106,6 +113,8 @@ def _events_from_update(update: dict, streamed_text: bool) -> Iterator[TurnEvent
                 # Models that do not stream deliver their text here in one piece.
                 if not streamed_text and text_of(message.content):
                     yield TextDelta(text_of(message.content))
+                if message.usage_metadata:
+                    yield ModelUsage(sum_usage([message]))
                 for call in message.tool_calls:
                     yield CodeSubmitted(call_id=call["id"], code=call["args"].get("code", ""))
             elif node == TOOLS_NODE and isinstance(message, ToolMessage):

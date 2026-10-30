@@ -95,9 +95,10 @@ def _answer(question: str, choice: ModelChoice, settings: Settings, workspace: W
         graph = build_graph(model, [make_python_tool(workspace, limits)], prompt)
         events = run_turn(graph, st.session_state.history, question, settings.max_agent_iterations)
         outcome = stream_reply(events, workspace)
-    # A failed turn is shown but kept out of the history the model sees next time.
+    # A failed turn is shown but kept out of the history the model sees next time. Its
+    # completed model calls were billed, so their usage is counted either way.
     st.session_state.transcript += (user_entry, AssistantEntry(outcome.parts, outcome.error))
+    st.session_state.session_usage += outcome.usage
+    st.session_state.last_usage = outcome.usage
     if outcome.finished is not None:
         st.session_state.history += outcome.finished.new_messages
-        st.session_state.session_usage += outcome.finished.usage
-        st.session_state.last_usage = outcome.finished.usage

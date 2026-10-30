@@ -14,6 +14,7 @@ from data_analyst_agent.replay import ReplayChatModel, ScriptedQuestion, ScriptS
 from data_analyst_agent.turn import (
     CodeFinished,
     CodeSubmitted,
+    ModelUsage,
     StepLimitReached,
     TextDelta,
     TurnFinished,
@@ -114,6 +115,27 @@ def test_step_limit_stops_a_turn_that_needs_more_model_calls(workspace):
     assert isinstance(collect(graph, growth.question, max_model_calls=3)[-1], TurnFinished)
     with pytest.raises(StepLimitReached, match="2 model calls"):
         collect(graph, growth.question, max_model_calls=2)
+
+
+def test_usage_of_each_model_call_is_reported_before_a_step_limit_failure(workspace):
+    graph = demo_graph(workspace, reported_usage=(10, 4))
+    events = []
+
+    with pytest.raises(StepLimitReached):
+        for event in run_turn(graph, [], DEMO_SCRIPT[2].question, max_model_calls=2):
+            events.append(event)
+
+    reported = [e.usage for e in events if isinstance(e, ModelUsage)]
+    assert reported == [TokenUsage(10, 4, 1), TokenUsage(10, 4, 1)]
+
+
+def test_reported_usage_matches_the_turn_total(workspace):
+    graph = demo_graph(workspace, reported_usage=(10, 4))
+
+    events = collect(graph, DEMO_SCRIPT[2].question)
+
+    reported = sum((e.usage for e in events if isinstance(e, ModelUsage)), TokenUsage())
+    assert reported == events[-1].usage == TokenUsage(30, 12, 3)
 
 
 def test_text_arrives_when_the_model_does_not_stream(workspace):

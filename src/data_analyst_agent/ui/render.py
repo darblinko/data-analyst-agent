@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -16,7 +16,8 @@ from data_analyst_agent.transcript import (
     TextPart,
     apply_event,
 )
-from data_analyst_agent.turn import StepLimitReached, TurnEvent, TurnFinished
+from data_analyst_agent.turn import ModelUsage, StepLimitReached, TurnEvent, TurnFinished
+from data_analyst_agent.usage import TokenUsage
 from data_analyst_agent.workspace import Workspace
 
 HTML_HEIGHT_PX = 500
@@ -76,16 +77,22 @@ class ReplyOutcome:
     parts: tuple[Part, ...]
     finished: TurnFinished | None  # None when the turn failed
     error: str | None = None
+    # Usage of the completed model calls, reported also when the turn failed.
+    usage: TokenUsage = field(default_factory=TokenUsage)
 
 
 def stream_reply(events: Iterable[TurnEvent], workspace: Workspace) -> ReplyOutcome:
     """Draw a reply while it streams. Each part gets a slot that is redrawn when it changes."""
     parts: tuple[Part, ...] = ()
     slots: list = []
+    usage = TokenUsage()
     try:
         for event in events:
             if isinstance(event, TurnFinished):
-                return ReplyOutcome(parts, event)
+                return ReplyOutcome(parts, event, usage=usage)
+            if isinstance(event, ModelUsage):
+                usage += event.usage
+                continue
             updated = apply_event(parts, event)
             for index, part in enumerate(updated):
                 if index == len(slots):
@@ -95,12 +102,13 @@ def stream_reply(events: Iterable[TurnEvent], workspace: Workspace) -> ReplyOutc
                         render_part(part, workspace)
             parts = updated
     except StepLimitReached as error:
-        return ReplyOutcome(parts, None, str(error))
+        return ReplyOutcome(parts, None, str(error), usage)
     except Exception as error:
         # Provider errors (authentication, rate limits, network) end the turn, not the app.
         logger.exception("Turn failed")
-        return ReplyOutcome(parts, None, f"The request failed: {type(error).__name__}: {error}")
-    return ReplyOutcome(parts, None, "The turn ended without a final answer.")
+        message = f"The request failed: {type(error).__name__}: {error}"
+        return ReplyOutcome(parts, None, message, usage)
+    return ReplyOutcome(parts, None, "The turn ended without a final answer.", usage)
 
 
 def _result_label(part: CodePart) -> str:
