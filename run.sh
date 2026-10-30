@@ -7,5 +7,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 exec uv run streamlit run app.py \
     --server.port 8501 \
     --server.address localhost \
+    --server.headless true \
     --browser.gatherUsageStats false \
     "$@"
