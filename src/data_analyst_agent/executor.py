@@ -11,6 +11,7 @@ Run untrusted prompts or files only inside a container or VM. POSIX only.
 """
 
 import contextlib
+import math
 import os
 import shutil
 import signal
@@ -63,6 +64,14 @@ class ExecutionLimits:
     max_output_bytes: int = 20_000
     max_artifact_bytes: int = MAX_ARTIFACT_BYTES
     max_artifacts: int = MAX_ARTIFACTS
+
+    def __post_init__(self) -> None:
+        # nan and inf would let the wait loop run forever, and 0 would drop all output.
+        if not math.isfinite(self.timeout_s) or self.timeout_s <= 0:
+            raise ValueError(f"timeout_s must be finite and greater than 0, got {self.timeout_s}")
+        for name in ("max_output_bytes", "max_artifact_bytes", "max_artifacts"):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"{name} must be greater than 0, got {getattr(self, name)}")
 
 
 @dataclass(frozen=True)

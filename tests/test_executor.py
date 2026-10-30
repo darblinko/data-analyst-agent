@@ -1,4 +1,5 @@
 import ast
+import math
 import os
 import sys
 import threading
@@ -307,6 +308,22 @@ def test_concurrent_collection_never_reuses_a_file_name(tmp_path):
     assert len(set(saved)) == calls
     contents = sorted(int((artifact_dir / name).read_text()) for name in saved)
     assert contents == list(range(calls))
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"timeout_s": math.nan},
+        {"timeout_s": math.inf},
+        {"timeout_s": 0},
+        {"max_output_bytes": 0},
+        {"max_artifact_bytes": -1},
+        {"max_artifacts": 0},
+    ],
+)
+def test_limits_reject_values_that_disable_a_limit(fields):
+    with pytest.raises(ValueError):
+        ExecutionLimits(**fields)
 
 
 def _wait_until_gone(pid: int, timeout_s: float = 3.0) -> bool:

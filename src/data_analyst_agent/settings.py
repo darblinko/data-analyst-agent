@@ -1,5 +1,6 @@
 """Runtime settings read from environment variables. See .env.example for the list."""
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -79,6 +80,6 @@ def _read_number(
         value = kind(raw)
     except ValueError as error:
         raise ValueError(f"{name} must be a {kind.__name__}, got {raw!r}") from error
-    if value <= 0:
-        raise ValueError(f"{name} must be greater than 0, got {raw!r}")
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a finite number greater than 0, got {raw!r}")
     return value
