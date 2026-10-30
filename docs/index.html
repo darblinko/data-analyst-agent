@@ -23,7 +23,7 @@
       <p class="lede">A LangGraph agent that answers questions about CSV and Excel files by writing Python, running it in a separate process with a timeout, and answering from the printed output. A scripted demo mode runs without an API key.</p>
       <dl class="record">
         <div><dt>Repository</dt><dd>darblinko/data-analyst-agent</dd></div>
-        <div><dt>Revision</dt><dd><code>40788c1</code></dd></div>
+        <div><dt>Revision</dt><dd><code>4a93e33</code></dd></div>
         <div><dt>Measured</dt><dd>2026-10-30</dd></div>
         <div><dt>License</dt><dd>Apache-2.0</dd></div>
       </dl>
@@ -53,7 +53,7 @@ flowchart TB
 
     <section>
       <h2>Measured results</h2>
-      <p>A new process per call means the interpreter start and the imports are paid on every call. Median wall time of <code>run_python</code>, 20 runs per case after 2 warm-up runs, one Linux x86_64 machine with 6 logical CPUs, Python 3.11.13, revision <code>40788c1</code>. Importing pandas accounts for most of the time of the demo code runs.</p>
+      <p>A new process per call means the interpreter start and the imports are paid on every call. Median wall time of <code>run_python</code>, 20 runs per case after 2 warm-up runs, one Linux x86_64 machine with 6 logical CPUs, Python 3.11.13, revision <code>4a93e33</code>. Importing pandas accounts for most of the time of the demo code runs.</p>
       <figure class="chart" data-chart="executor-timing"></figure>
       <aside class="note">
         <p>Source: <code>results/executor-timing.json</code>. Reproduce: <code>uv run python scripts/bench_executor.py</code></p>
@@ -85,7 +85,7 @@ uv run pytest -q</code></pre></li>
   </main>
 
   <footer>
-    data-analyst-agent. Apache-2.0. Figures generated from <code>docs/data.json</code> at <code>40788c1</code>.
+    data-analyst-agent. Apache-2.0. Figures generated from <code>docs/data.json</code> at <code>4a93e33</code>.
   </footer>
 
   <script src="charts.js" defer></script>
