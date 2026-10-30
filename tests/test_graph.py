@@ -25,7 +25,8 @@ from data_analyst_agent.usage import TokenUsage
 from data_analyst_agent.workspace import Workspace
 
 LIMITS = ExecutionLimits(timeout_s=60.0, max_output_bytes=20_000)
-NUMBER = re.compile(r"\d+(?:,\d{3})*(?:\.\d+)?")
+# A date or a complete signed number, not part of a longer number or word.
+NUMBER = re.compile(r"(?<![\w.,])(?:\d{4}-\d{2}(?:-\d{2})?|[+-]?\d+(?:,\d{3})*(?:\.\d+)?)(?!\w)")
 
 
 @pytest.fixture
@@ -53,10 +54,34 @@ def test_demo_answers_quote_only_numbers_that_the_code_printed(workspace, script
 
     outputs = "\n".join(e.output for e in events if isinstance(e, CodeFinished))
     final_answer = scripted.steps[-1].text
-    missing = [n for n in NUMBER.findall(final_answer) if n not in outputs]
-    assert missing == []
+    assert unsupported_numbers(final_answer, outputs) == []
     assert isinstance(events[-1], TurnFinished)
     assert text_of(events[-1].new_messages[-1].content) == final_answer
+
+
+def unsupported_numbers(answer: str, outputs: str) -> list[str]:
+    """Numbers in `answer` that the outputs do not contain as complete values with the sign."""
+    printed = {_normalize_number(n) for n in NUMBER.findall(outputs)}
+    return [n for n in NUMBER.findall(answer) if _normalize_number(n) not in printed]
+
+
+def _normalize_number(token: str) -> str:
+    return token.removeprefix("+").replace(",", "")
+
+
+@pytest.mark.parametrize(
+    ("answer", "outputs", "unsupported"),
+    [
+        ("43 rows", "total 6,013,439", ["43"]),
+        ("a change of -27.2%", "change +27.2%", ["-27.2"]),
+        ("a change of +27.2%", "change +27.2%", []),
+        ("covers 2024-01-01 to 2025-12-31", "2024-01-01 2025-12-31", []),
+        ("from 2024-01", "2024-01-01", ["2024-01"]),
+        ("6,013,439 in total", "6013439", []),
+    ],
+)
+def test_unsupported_numbers_compares_complete_signed_values(answer, outputs, unsupported):
+    assert unsupported_numbers(answer, outputs) == unsupported
 
 
 def test_demo_turn_event_sequence_and_saved_messages(workspace):
