@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "repo": "data-analyst-agent",
+    "revision": "40788c1",
+    "measured": "2026-10-30"
+  },
+  "charts": [
+    {
+      "name": "executor-timing",
+      "type": "hbar",
+      "title": "Median wall time per run_python call, seconds",
+      "subtitle": "20 runs per case after 2 warm-up runs, Linux x86_64, 6 logical CPUs",
+      "source": "results/executor-timing.json",
+      "alt": "An empty cell takes 0.12 s, importing pandas 1.03 s and the demo chart 1.63 s.",
+      "format": "decimal2",
+      "data": [
+        {
+          "label": "Empty cell",
+          "value": 0.12
+        },
+        {
+          "label": "import pandas",
+          "value": 1.03
+        },
+        {
+          "label": "Demo: overview",
+          "value": 1.05
+        },
+        {
+          "label": "Demo: monthly chart",
+          "value": 1.63
+        },
+        {
+          "label": "Demo: growth, failing try",
+          "value": 1.01
+        },
+        {
+          "label": "Demo: growth",
+          "value": 0.92
+        }
+      ]
+    }
+  ]
+}
