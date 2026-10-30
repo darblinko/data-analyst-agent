@@ -1,6 +1,8 @@
 """Sidebar: model choice, data files, conversation reset and token usage."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Protocol
 
 import streamlit as st
 
@@ -41,6 +43,27 @@ def render_sidebar(settings: Settings, workspace: Workspace) -> ModelChoice:
     return choice
 
 
+class Upload(Protocol):
+    file_id: str
+    name: str
+
+    def getvalue(self) -> bytes: ...
+
+
+def add_new_uploads(
+    workspace: Workspace, uploads: Iterable[Upload], processed: frozenset[str]
+) -> frozenset[str]:
+    """Copy uploads not seen before into the workspace and return the updated seen IDs.
+
+    The uploader returns its files on every rerun, so each one is added once.
+    """
+    for upload in uploads:
+        if upload.file_id not in processed:
+            workspace.add_data(upload.name, upload.getvalue())
+            processed = processed | {upload.file_id}
+    return processed
+
+
 def reset_conversation() -> None:
     st.session_state.history = ()
     st.session_state.transcript = ()
@@ -71,11 +94,9 @@ def _data_section(settings: Settings, workspace: Workspace) -> None:
         st.caption(f"data/{SAMPLE_DATA_PATH.name} (sample dataset)")
         return
     uploads = st.file_uploader("Upload", type=UPLOAD_TYPES, accept_multiple_files=True)
-    for upload in uploads or []:
-        # The uploader returns its files on every rerun; add each one once.
-        if upload.file_id not in st.session_state.processed_uploads:
-            workspace.add_data(upload.name, upload.getvalue())
-            st.session_state.processed_uploads |= {upload.file_id}
+    st.session_state.processed_uploads = add_new_uploads(
+        workspace, uploads or [], st.session_state.processed_uploads
+    )
     if st.button("Add sample dataset", use_container_width=True):
         workspace.copy_in(SAMPLE_DATA_PATH)
     names = workspace.data_file_names()
