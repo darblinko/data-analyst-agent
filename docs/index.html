@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>data-analyst-agent</title>
+  <meta name="description" content="A LangGraph agent that answers questions about CSV and Excel files by writing Python and running it in a separate process with a timeout.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="https://darblinko.github.io/">Mitchell Foutz</a>
+    <a href="https://github.com/darblinko/data-analyst-agent">Source on GitHub</a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>data-analyst-agent</h1>
+      <p class="lede">A LangGraph agent that answers questions about CSV and Excel files by writing Python, running it in a separate process with a timeout, and answering from the printed output. A scripted demo mode runs without an API key.</p>
+      <dl class="record">
+        <div><dt>Repository</dt><dd>darblinko/data-analyst-agent</dd></div>
+        <div><dt>Revision</dt><dd><code>40788c1</code></dd></div>
+        <div><dt>Measured</dt><dd>2026-10-30</dd></div>
+        <div><dt>License</dt><dd>Apache-2.0</dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Problem</h2>
+      <p>The first version of this project ran model-written code with <code>exec()</code> inside the Streamlit process. The code shared one module-level namespace across all browser sessions, inherited every environment variable of the app including the API keys, and had no time limit, so a <code>while True</code> loop never returned. Its docstrings described a path restriction and a timeout that the code did not implement.</p>
+      <aside class="note">
+        <p>The replacement and its tests: <code>src/data_analyst_agent/executor.py</code>, <code>tests/test_executor.py</code> (16 tests).</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>How it works</h2>
+      <p>A two-node LangGraph loop calls the model and the <code>run_python</code> tool until the model answers without a tool call. Each tool call runs in a new Python process with a temporary working directory, an environment of seven allowlisted variables, a cap on captured output and a wall-clock timeout that kills the whole process group. Files the code saves to <code>outputs/</code> are shown in the chat.</p>
+      <pre class="mermaid">
+flowchart TB
+  user["Question"] --> agent["agent node: chat model"]
+  agent -- "tool call" --> tools["tools node: run_python"]
+  tools --> executor["new Python process, temporary directory"]
+  executor -- "output, exit code, saved files" --> tools
+  tools --> agent
+  agent -- "answer" --> user
+      </pre>
+    </section>
+
+    <section>
+      <h2>Measured results</h2>
+      <p>A new process per call means the interpreter start and the imports are paid on every call. Median wall time of <code>run_python</code>, 20 runs per case after 2 warm-up runs, one Linux x86_64 machine with 6 logical CPUs, Python 3.11.13, revision <code>40788c1</code>. Importing pandas accounts for most of the time of the demo code runs.</p>
+      <figure class="chart" data-chart="executor-timing"></figure>
+      <aside class="note">
+        <p>Source: <code>results/executor-timing.json</code>. Reproduce: <code>uv run python scripts/bench_executor.py</code></p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Run it</h2>
+      <ol class="steps">
+        <li><pre><code>git clone https://github.com/darblinko/data-analyst-agent
+cd data-analyst-agent</code></pre></li>
+        <li><pre><code>uv sync
+uv run pytest -q</code></pre></li>
+        <li><pre><code>DEMO_MODE=1 ./run.sh</code></pre></li>
+      </ol>
+      <p>Open http://localhost:8501 and pick a demo question. For your own questions, copy <code>.env.example</code> to <code>.env</code>, set <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> and run <code>./run.sh</code>.</p>
+    </section>
+
+    <section>
+      <h2>Limitations</h2>
+      <ul>
+        <li>Process isolation is not a security sandbox. The child runs as the app's user, can read that user's files, including a <code>.env</code> file, and has network access. Untrusted prompts or files need a container or VM.</li>
+        <li>Saved HTML charts render in a Streamlit component iframe with <code>allow-scripts</code> and <code>allow-same-origin</code>.</li>
+        <li>Variables do not persist between code runs; the model reloads the data in every call.</li>
+        <li>The tests use a scripted replay model only. Behavior with live OpenAI and Anthropic models is not tested.</li>
+        <li>POSIX only: the timeout uses process groups.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    data-analyst-agent. Apache-2.0. Figures generated from <code>docs/data.json</code> at <code>40788c1</code>.
+  </footer>
+
+  <script src="charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>
