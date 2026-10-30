@@ -223,6 +223,9 @@ class _CappedReader:
 
 def _collect_artifacts(output_dir: Path, artifact_dir: Path) -> tuple[str, ...]:
     """Move regular files from outputs/ to artifact_dir. Symlinks and folders are skipped."""
+    # The code may have deleted outputs/ or replaced it with a link to another folder.
+    if output_dir.is_symlink() or not output_dir.is_dir():
+        return ()
     files = [p for p in sorted(output_dir.iterdir()) if p.is_file() and not p.is_symlink()]
     if not files:
         return ()

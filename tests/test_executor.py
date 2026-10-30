@@ -228,6 +228,28 @@ def test_cell_runs_as_the_main_module():
     assert result.stdout == "__main__ 5\n"
 
 
+def test_removed_outputs_folder_does_not_lose_the_result(tmp_path):
+    code = "import shutil\nshutil.rmtree('outputs')\nprint(42)"
+
+    result = run_python(code, artifact_dir=tmp_path / "artifacts", limits=FAST)
+
+    assert result.succeeded
+    assert result.stdout == "42\n"
+    assert result.artifacts == ()
+
+
+def test_outputs_replaced_by_a_symlink_is_not_followed(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("keep")
+    code = f"import os, shutil\nshutil.rmtree('outputs')\nos.symlink({str(outside)!r}, 'outputs')"
+
+    result = run_python(code, artifact_dir=tmp_path / "artifacts", limits=FAST)
+
+    assert result.artifacts == ()
+    assert (outside / "keep.txt").read_text() == "keep"
+
+
 def _wait_until_gone(pid: int, timeout_s: float = 3.0) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
