@@ -79,7 +79,7 @@ uv run pytest -q</code></pre></li>
         <li>Saved HTML charts render in a Streamlit component iframe with <code>allow-scripts</code> and <code>allow-same-origin</code>.</li>
         <li>Variables do not persist between code runs; the model reloads the data in every call.</li>
         <li>The tests use a scripted replay model only. Behavior with live OpenAI and Anthropic models is not tested.</li>
-        <li>POSIX only: the timeout uses process groups.</li>
+        <li>POSIX only: the timeout uses process groups. A process that the generated code moves to a new session or process group is not killed.</li>
       </ul>
     </section>
   </main>

@@ -6,7 +6,9 @@ the parent process are not passed on), a wall-clock timeout that kills the whole
 process group, a cap on the captured output, and caps on the size and number of saved files.
 
 This is process isolation with a timeout. It is not a security sandbox: the child runs
-as the same user, can read and write any file that user can, and has network access.
+as the same user, can read and write any file that user can, and has network access. The
+kill reaches only processes that stay in the child's process group; a process the code
+moves to a new session or group survives the call.
 Run untrusted prompts or files only inside a container or VM. POSIX only.
 """
 
@@ -192,7 +194,7 @@ def _run_child(
         timed_out = False
     except subprocess.TimeoutExpired:
         exit_code, timed_out = None, True
-    # Kill the group in both cases so no background process outlives the call.
+    # Kill the group in both cases so background processes left in it do not outlive the call.
     _kill_process_group(process.pid)
     process.wait()
     stdout.join()
